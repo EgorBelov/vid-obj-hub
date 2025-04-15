@@ -10,7 +10,7 @@ from src.recognition import detect_objects_in_video
 from decouple import config
 from recognition_service.celery_app import celery_app
 from recognition_service.detect import process_video_task  # наша Celery задача
-
+from src.bot.keyboards.status import get_status_keyboard
 
 VIDEO_STORAGE = config('VIDEO_STORAGE')
 if not os.path.exists(VIDEO_STORAGE):
@@ -86,7 +86,8 @@ async def handle_video(message: types.Message):
     celery_app.send_task("process_video_task", args=[video_id])
     # process_video_task.delay(video_id)
 
+    # Отправляем пользователю сообщение с кодом видео и inline-клавиатурой для проверки статуса
     await message.reply(
-        "Видео получено! Обработка запущена асинхронно. Проверьте статус позже.",
-        reply_markup=main_menu_keyboard
+        f"Ваше видео успешно загружено. Его код: {video_id}.\nНажмите кнопку 'Проверить статус', чтобы узнать статус обработки.",
+        reply_markup=get_status_keyboard(video_id)
     )

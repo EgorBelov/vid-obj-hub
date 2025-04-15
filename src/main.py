@@ -5,6 +5,7 @@ import logging
 from decouple import config
 
 from aiogram import Bot, Dispatcher, F
+from src.bot.handlers.status_callback import register_status_callback_handlers
 from src.database.session import init_db
 from src.database.models import Base
 
@@ -21,9 +22,11 @@ async def main():
     # Регистрируем хэндлеры
     dp.message.register(start_cmd, F.text == "/start")
     dp.message.register(handle_video, F.video)
-    dp.message.register(status_cmd, F.text.startswith("/status"))
+    # dp.message.register(status_cmd, F.text.startswith("/status"))
     
     dp.message.register(handle_text, F.text)
+    
+    register_status_callback_handlers(dp)
     
     # Инициализируем БД (создаём таблицы, если их нет)
     await init_db(Base)
