@@ -11,6 +11,7 @@ from src.database.models import Base
 from src.bot.handlers.start import start_cmd
 from src.bot.handlers.video import handle_video
 from src.bot.handlers.text import handle_text
+from src.bot.handlers.status import status_cmd
 
 async def main():
     logging.basicConfig(level=logging.INFO)
@@ -20,8 +21,10 @@ async def main():
     # Регистрируем хэндлеры
     dp.message.register(start_cmd, F.text == "/start")
     dp.message.register(handle_video, F.video)
+    dp.message.register(status_cmd, F.text.startswith("/status"))
+    
     dp.message.register(handle_text, F.text)
-
+    
     # Инициализируем БД (создаём таблицы, если их нет)
     await init_db(Base)
 
