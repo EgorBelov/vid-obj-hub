@@ -1,0 +1,9 @@
+asyncpg
+aiogram
+APScheduler
+python-decouple
+SQLAlchemy
+psycopg2
+torch
+opencv-python
+ultralytics
