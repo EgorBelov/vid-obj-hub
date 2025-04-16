@@ -8,3 +8,4 @@ torch
 opencv-python
 ultralytics
 boto3
+httpx

@@ -31,7 +31,7 @@ async def main():
     register_status_callback_handlers(dp)
     
     # Инициализируем БД (создаём таблицы, если их нет)
-    await init_db(Base)
+    # await init_db(Base)
 
     # Запускаем поллинг
     await dp.start_polling(bot)

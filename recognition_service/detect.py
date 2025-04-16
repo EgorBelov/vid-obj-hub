@@ -3,77 +3,67 @@ import os
 import tempfile
 import cv2
 from math import floor
-from celery import shared_task
 import requests
+import httpx
 from ultralytics import YOLO
 from decouple import config
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-# Используем абсолютный импорт для корректного разрешения
 from recognition_service.celery_app import celery_app
-from src.database.models import Video, VideoObject
 
-# Загружаем модель YOLOv8n (предполагается, что веса лежат в yolov8n.pt)
+# Загружаем модель YOLOv8n (предполагается, что файл yolov8n.pt находится в рабочем каталоге или доступен)
 model = YOLO("yolov8n.pt")
 
-DB_URL_SYNC = config("DATABASE_URL_SYNC")
-engine = create_engine(DB_URL_SYNC, echo=False)
-SessionLocal = sessionmaker(bind=engine)
+# URL DB-сервиса, например "http://localhost:8000"
+DB_SERVICE_URL = config("DB_SERVICE_URL", default="http://localhost:8000")
 
 @celery_app.task(name="process_video_task")
 def process_video_task(video_id: int):
     """
-    Задача Celery: агрегированное распознавание объектов в видео.
-    Для каждого класса объекта считается:
-      - total_count: количество появлений,
+    Задача для агрегированного распознавания объектов в видео,
+    которая обращается к DB-сервису по HTTP API.
+    Для каждого класса объекта вычисляются:
+      - total_count: число появлений,
       - avg_confidence: средняя уверенность,
       - best_confidence: максимальная уверенность,
-      - best_second: секунда видео, когда уверенность была максимальной.
+      - best_second: время (в секундах), когда наблюдалась максимальная уверенность.
     """
-    session = SessionLocal()
     try:
-        video = session.query(Video).filter_by(id=video_id).one_or_none()
-        if not video:
-            return f"Video id={video_id} not found!"
-
-        # if not video.local_path or not os.path.exists(video.local_path):
-        #     video.status = "error"
-        #     session.commit()
-        #     return f"File {video.local_path} not found!"
+        # 1. Получаем информацию о видео через DB-сервис
+        with httpx.Client() as client:
+            video_resp = client.get(f"{DB_SERVICE_URL}/videos/{video_id}")
+            if video_resp.status_code != 200:
+                return f"Video id={video_id} not found!"
+            video_data = video_resp.json()
+            
+            # Для обработки нам нужен s3_url
+            s3_url = video_data.get("s3_url")
+            if not s3_url:
+                client.put(f"{DB_SERVICE_URL}/videos/{video_id}", json={"status": "error"})
+                return f"No s3_url in DB for video id={video_id}!"
+            
+            # Обновляем статус видео на "processing"
+            client.put(f"{DB_SERVICE_URL}/videos/{video_id}", json={"status": "processing"})
         
-        s3_url = video.s3_url
-        if not s3_url:
-            video.status = "error"
-            session.commit()
-            return "No s3_url in DB!"
-
-        video.status = "processing"
-        session.commit()
-
-        # Скачиваем из S3 во временный файл
+        # 2. Скачиваем видео из S3 во временный файл
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmpfile:
             response = requests.get(s3_url, stream=True)
             if response.status_code != 200:
-                video.status = "error"
-                session.commit()
+                with httpx.Client() as client:
+                    client.put(f"{DB_SERVICE_URL}/videos/{video_id}", json={"status": "error"})
                 return f"Error downloading {s3_url}"
             for chunk in response.iter_content(chunk_size=8192):
                 tmpfile.write(chunk)
             tmp_path = tmpfile.name
 
+        # 3. Обрабатываем видео: собираем агрегированную статистику
+        counts = {}      # {label: count}
+        sum_conf = {}    # {label: cumulative confidence}
+        best_conf = {}   # {label: maximum confidence}
+        best_sec = {}    # {label: second when max confidence recorded}
 
-        counts = {}      # {label: количество}
-        sum_conf = {}    # {label: суммарная уверенность}
-        best_conf = {}   # {label: максимальная уверенность}
-        best_sec = {}    # {label: секунда с максимальной уверенностью}
-
-        # cap = cv2.VideoCapture(video.local_path)
         cap = cv2.VideoCapture(tmp_path)
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         frame_index = 0
-
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -82,10 +72,8 @@ def process_video_task(video_id: int):
 
             try:
                 results = model(frame)
-            except Exception as e:
-                # Если возникла ошибка при обработке кадра, пропускаем его
+            except Exception:
                 continue
-
             if not results or len(results) == 0:
                 continue
 
@@ -99,45 +87,46 @@ def process_video_task(video_id: int):
                     conf = float(boxes.conf[i])
                     cls_id = int(boxes.cls[i])
                     label = r.names[cls_id]
-                except Exception as ex:
+                except Exception:
                     continue
 
                 counts[label] = counts.get(label, 0) + 1
                 sum_conf[label] = sum_conf.get(label, 0.0) + conf
-
                 if label not in best_conf or conf > best_conf[label]:
                     best_conf[label] = conf
                     best_sec[label] = frame_index / fps
 
         cap.release()
+        os.remove(tmp_path)  # Очистим временный файл
 
         if not counts:
-            video.status = "processed"
-            session.commit()
+            # Если объекты не обнаружены, обновляем статус и выходим
+            with httpx.Client() as client:
+                client.put(f"{DB_SERVICE_URL}/videos/{video_id}", json={"status": "processed"})
             return f"Video {video_id} processed successfully, but no objects detected."
 
-        # Удаляем предыдущие агрегированные записи для данного видео (если есть)
-        session.query(VideoObject).filter_by(video_id=video_id).delete()
+        # 4. Обновляем агрегированные данные через DB-сервис:
+        with httpx.Client() as client:
+            # Сначала удаляем старые агрегированные записи для этого видео
+            client.delete(f"{DB_SERVICE_URL}/videos/{video_id}/objects")
 
-        for label, total_count in counts.items():
-            avg_conf = sum_conf[label] / total_count
-            vo = VideoObject(
-                video_id=video_id,
-                label=label,
-                total_count=total_count,
-                avg_confidence=avg_conf,
-                best_confidence=best_conf[label],
-                best_second=best_sec[label]
-            )
-            session.add(vo)
+            # Затем для каждого label создаем новую запись
+            for label, total_count in counts.items():
+                avg_conf = sum_conf[label] / total_count
+                payload = {
+                    "video_id": video_id,
+                    "label": label,
+                    "total_count": total_count,
+                    "avg_confidence": avg_conf,
+                    "best_confidence": best_conf[label],
+                    "best_second": best_sec[label]
+                }
+                post_resp = client.post(f"{DB_SERVICE_URL}/videos/{video_id}/objects", json=payload)
+                # Можно добавить проверку post_resp.status_code
 
-        video.status = "processed"
-        session.commit()
+            # Обновляем статус видео на "processed"
+            client.put(f"{DB_SERVICE_URL}/videos/{video_id}", json={"status": "processed"})
 
         return f"Video {video_id} processed successfully with {len(counts)} labels."
-
     except Exception as e:
-        # Логирование ошибки (вы можете добавить self.retry() если хотите повтор)
         return f"Error processing video {video_id}: {str(e)}"
-    finally:
-        session.close()
