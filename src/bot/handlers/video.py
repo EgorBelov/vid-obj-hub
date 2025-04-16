@@ -1,4 +1,5 @@
 # src/bot/handlers/video.py
+import io
 import os
 from datetime import datetime
 from aiogram import types
@@ -11,6 +12,7 @@ from decouple import config
 from recognition_service.celery_app import celery_app
 from recognition_service.detect import process_video_task  # наша Celery задача
 from src.bot.keyboards.status import get_status_keyboard
+from src.s3.s3_client import upload_fileobj
 
 VIDEO_STORAGE = config('VIDEO_STORAGE')
 if not os.path.exists(VIDEO_STORAGE):
@@ -20,21 +22,38 @@ async def handle_video(message: types.Message):
     video = message.video
     file_id = video.file_id
 
-    # Получаем путь к файлу Telegram
+    # # Получаем путь к файлу Telegram
+    # file_info = await message.bot.get_file(file_id)
+    # remote_file_path = file_info.file_path
+
+    # # Формируем локальный путь
+    # local_file_path = os.path.join(VIDEO_STORAGE, f"{file_id}.mp4")
+
+    # # Скачиваем видео на диск
+    # await message.bot.download_file(remote_file_path, local_file_path)
+    
+    # Получаем информацию о файле
     file_info = await message.bot.get_file(file_id)
-    remote_file_path = file_info.file_path
+    file_path = file_info.file_path
+    
+    # Скачиваем файл в память (BytesIO)
+    byte_stream = io.BytesIO()
+    await message.bot.download_file(file_path, byte_stream)
+    byte_stream.seek(0)  # сбрасываем указатель в начало
 
-    # Формируем локальный путь
-    local_file_path = os.path.join(VIDEO_STORAGE, f"{file_id}.mp4")
+    # Создаём ключ (S3-имя) для файла
+    # например, "videos/{telegram_file_id}.mp4"
+    key = f"videos/{file_id}.mp4"
 
-    # Скачиваем видео на диск
-    await message.bot.download_file(remote_file_path, local_file_path)
+    # Загружаем в S3
+    s3_url = upload_fileobj(byte_stream, key=key)
 
     # Сохраняем информацию о видео в БД
     async with AsyncSessionLocal() as session:
         new_video = Video(
             telegram_file_id=file_id,
-            local_path=local_file_path,
+            # local_path=local_file_path,
+            s3_url=s3_url,  # теперь мы храним ссылку на объект в S3
             user_id=message.from_user.id,
             upload_time=datetime.utcnow(),
             # status="pending"  # если нужно

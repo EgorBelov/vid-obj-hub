@@ -1,7 +1,10 @@
+# recognition_service/detect.py
 import os
+import tempfile
 import cv2
 from math import floor
 from celery import shared_task
+import requests
 from ultralytics import YOLO
 from decouple import config
 
@@ -35,20 +38,39 @@ def process_video_task(video_id: int):
         if not video:
             return f"Video id={video_id} not found!"
 
-        if not video.local_path or not os.path.exists(video.local_path):
+        # if not video.local_path or not os.path.exists(video.local_path):
+        #     video.status = "error"
+        #     session.commit()
+        #     return f"File {video.local_path} not found!"
+        
+        s3_url = video.s3_url
+        if not s3_url:
             video.status = "error"
             session.commit()
-            return f"File {video.local_path} not found!"
+            return "No s3_url in DB!"
 
         video.status = "processing"
         session.commit()
+
+        # Скачиваем из S3 во временный файл
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmpfile:
+            response = requests.get(s3_url, stream=True)
+            if response.status_code != 200:
+                video.status = "error"
+                session.commit()
+                return f"Error downloading {s3_url}"
+            for chunk in response.iter_content(chunk_size=8192):
+                tmpfile.write(chunk)
+            tmp_path = tmpfile.name
+
 
         counts = {}      # {label: количество}
         sum_conf = {}    # {label: суммарная уверенность}
         best_conf = {}   # {label: максимальная уверенность}
         best_sec = {}    # {label: секунда с максимальной уверенностью}
 
-        cap = cv2.VideoCapture(video.local_path)
+        # cap = cv2.VideoCapture(video.local_path)
+        cap = cv2.VideoCapture(tmp_path)
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         frame_index = 0
 
