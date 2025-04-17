@@ -10,6 +10,7 @@ class Video(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     telegram_file_id = Column(String, unique=True, index=True)
+    video_hash = Column(String, unique=True, index=True)
     # local_path = Column(String)  # путь к локальному файлу видео
     s3_url = Column(String, nullable=True)
     user_id = Column(Integer)

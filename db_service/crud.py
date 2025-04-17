@@ -41,3 +41,7 @@ async def update_video(db: AsyncSession, video_id: int, video_data: dict):
     await db.commit()
     await db.refresh(db_video)
     return db_video
+
+async def get_video_by_hash(db: AsyncSession, video_hash: str):
+    res = await db.execute(select(models.Video).where(models.Video.video_hash == video_hash))
+    return res.scalars().first()

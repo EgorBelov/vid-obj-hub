@@ -1,6 +1,7 @@
 # db_service/app.py
 from typing import AsyncGenerator
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy import delete
 from database import AsyncSessionLocal, engine
 import models, schemas, crud
@@ -21,9 +22,23 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session
 
-@app.post("/videos/", response_model=schemas.Video)
-async def create_video(video: schemas.VideoCreate, db: AsyncSession = Depends(get_db)):
-    return await crud.create_video(db, video)
+# @app.post("/videos/", response_model=schemas.Video)
+# async def create_video(video: schemas.VideoCreate, db: AsyncSession = Depends(get_db)):
+#     return await crud.create_video(db, video)
+
+@app.post("/videos/", response_model=schemas.Video | None)
+async def create_video(info: schemas.VideoCreate, db: AsyncSession = Depends(get_db)):
+    duplicate = await crud.get_video_by_hash(db, info.video_hash)
+    if duplicate:
+        data = schemas.Video.from_orm(duplicate).model_dump(mode="json")
+        data["duplicate"] = True
+        return JSONResponse(status_code=200, content=data)
+
+    new_video = await crud.create_video(db, info)
+    data = schemas.Video.from_orm(new_video).model_dump(mode="json")
+    data["duplicate"] = False
+    return JSONResponse(status_code=201, content=data)
+
 
 @app.get("/videos/{video_id}", response_model=schemas.Video)
 async def read_video(video_id: int, db: AsyncSession = Depends(get_db)):

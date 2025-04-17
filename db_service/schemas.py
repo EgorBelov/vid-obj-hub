@@ -9,8 +9,14 @@ class VideoBase(BaseModel):
     user_id: int
     status: Optional[str] = "pending"
 
-class VideoCreate(VideoBase):
-    pass
+class VideoCreate(BaseModel):
+    telegram_file_id: str
+    user_id: int
+    video_hash: str          # ← обязательно
+    s3_url: str | None = None
+    status: str = "pending"
+    upload_time: datetime
+
 
 class Video(VideoBase):
     id: int
@@ -18,6 +24,7 @@ class Video(VideoBase):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 class VideoObjectBase(BaseModel):
     label: str
@@ -44,7 +51,7 @@ class VideoObject(VideoObjectBase):
     class Config:
         orm_mode = True
 
-
 class VideoUpdate(BaseModel):
     status: Optional[str] = None
-    # при желании другие поля
+    s3_url: Optional[str] = None
+
