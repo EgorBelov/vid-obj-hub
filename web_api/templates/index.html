@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="grid md:grid-cols-2 gap-8">
+  <div class="bg-white p-6 rounded-xl shadow">
+    <h2 class="text-lg font-medium mb-4">Загрузить файл</h2>
+    <form action="/upload/file" method="post" enctype="multipart/form-data" class="space-y-4">
+      <input type="file" name="file" accept="video/*" required class="block" />
+      <button class="px-4 py-2 bg-blue-600 text-white rounded">Upload</button>
+    </form>
+  </div>
+
+  <div class="bg-white p-6 rounded-xl shadow">
+    <h2 class="text-lg font-medium mb-4">Ссылка на видео (VK / mp4)</h2>
+    <form action="/upload/url" method="post" class="space-y-4">
+      <input type="text" name="url" placeholder="https://vk.com/video..." required class="w-full border rounded px-3 py-2" />
+      <button class="px-4 py-2 bg-blue-600 text-white rounded">Send link</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

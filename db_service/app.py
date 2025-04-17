@@ -1,5 +1,5 @@
 # db_service/app.py
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy import delete
@@ -106,6 +106,12 @@ async def create_object_for_video(video_id: int, vo_data: schemas.VideoObjectCre
 
     new_vo = await crud.create_video_object(db, vo_data)
     return new_vo
+
+
+@app.get("/search", response_model=List[schemas.SearchResult])
+async def search(q: str, db: AsyncSession = Depends(get_db)):
+    results = await crud.search_objects(db, q)
+    return results
 
 
 if __name__ == '__main__':

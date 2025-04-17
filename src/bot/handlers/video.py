@@ -7,8 +7,7 @@ from aiogram import types
 from decouple import config
 import httpx
 from recognition_service.celery_app import celery_app
-
-from src.s3.s3_client import upload_fileobj
+from s3.s3_client import upload_fileobj
 from src.bot.keyboards.status import get_status_keyboard
 
 # URL DB-сервиса (например, http://localhost:8000)
@@ -58,7 +57,6 @@ async def handle_video(message: types.Message):
     # Загружаем видео в S3 через модуль s3_client.upload_fileobj,
     # при этом формируем ключ, например, "videos/<telegram_file_id>.mp4"
     key = f"videos/{file_id}.mp4"
-    from src.s3.s3_client import upload_fileobj  # если еще не импортировали
     s3_url = upload_fileobj(byte_stream, key=key)
 
     # # Создаем запись о видео через API DB-сервиса:

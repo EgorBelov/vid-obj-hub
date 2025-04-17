@@ -9,7 +9,8 @@ class Video(Base):
     __tablename__ = "videos"
 
     id = Column(Integer, primary_key=True, index=True)
-    telegram_file_id = Column(String, unique=True, index=True)
+    # db_service/models.py
+    telegram_file_id = Column(String, nullable=True, unique=True, index=True)
     video_hash = Column(String, unique=True, index=True)
     # local_path = Column(String)  # путь к локальному файлу видео
     s3_url = Column(String, nullable=True)

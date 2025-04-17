@@ -4,13 +4,13 @@ from typing import Optional
 from datetime import datetime
 
 class VideoBase(BaseModel):
-    telegram_file_id: str
+    telegram_file_id: Optional[str] = None 
     s3_url: Optional[str] = None
     user_id: int
     status: Optional[str] = "pending"
 
 class VideoCreate(BaseModel):
-    telegram_file_id: str
+    telegram_file_id: Optional[str] = None 
     user_id: int
     video_hash: str          # ← обязательно
     s3_url: str | None = None
@@ -55,3 +55,12 @@ class VideoUpdate(BaseModel):
     status: Optional[str] = None
     s3_url: Optional[str] = None
 
+
+class SearchResult(BaseModel):
+    video_id: int
+    label: str
+    best_second: float
+    total_count: int
+
+    class Config:
+        from_attributes = True
