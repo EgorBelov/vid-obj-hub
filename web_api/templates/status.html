@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+{% block content %}
+<a href="/" class="text-blue-600">&larr; домой</a>
+<h2 class="text-xl font-semibold mt-4 mb-2">Видео ID {{ video.id }}</h2>
+<p>Статус: <strong>{{ video.status }}</strong></p>
+{% if video.status != "processed" %}
+  <p class="mt-2">Страница обновляется каждые 5 секунд…</p>
+  <script>setTimeout(()=>location.reload(),5000)</script>
+{% else %}
+  <h3 class="text-lg font-medium mt-6 mb-2">Объекты</h3>
+  {% if objects %}
+    <table class="table-auto bg-white shadow rounded">
+      <thead class="bg-gray-200">
+        <tr><th class="px-3 py-1">Label</th><th>Count</th><th>Avg conf</th><th>Best conf</th><th>Best sec</th></tr>
+      </thead>
+      <tbody>
+      {% for o in objects %}
+        <tr class="border-t">
+          <td class="px-3 py-1">{{ o.label }}</td>
+          <td>{{ o.total_count }}</td>
+          <td>{{ '%.2f'|format(o.avg_confidence) }}</td>
+          <td>{{ '%.2f'|format(o.best_confidence) }}</td>
+          <td>{{ '%.1f'|format(o.best_second) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Ничего не обнаружено.</p>
+  {% endif %}
+{% endif %}
+{% endblock %}

@@ -1,4 +1,5 @@
 # db_service/crud.py
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 import models, schemas
@@ -45,3 +46,23 @@ async def update_video(db: AsyncSession, video_id: int, video_data: dict):
 async def get_video_by_hash(db: AsyncSession, video_hash: str):
     res = await db.execute(select(models.Video).where(models.Video.video_hash == video_hash))
     return res.scalars().first()
+
+
+async def search_objects(db: AsyncSession, query: str, limit: int = 3):
+    stmt = (
+        select(models.VideoObject)
+        .where(models.VideoObject.label.ilike(f"%{query}%"))
+        .order_by(func.random())         # случайный порядок
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    # превращаем в список схем
+    return [
+        schemas.SearchResult(
+            video_id=r.video_id,
+            label=r.label,
+            best_second=r.best_second,
+            total_count=r.total_count,
+        )
+        for r in rows
+    ]

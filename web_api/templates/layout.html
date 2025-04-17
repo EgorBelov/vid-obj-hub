@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Vid‑Obj Hub</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <header class="bg-blue-600 text-white px-6 py-3 mb-6 flex items-center justify-between">
+        <h1 class="text-xl font-semibold">
+          <a href="/" class="hover:underline">Vid‑Obj Hub</a>
+        </h1>
+      
+        <!--  🔍 строка поиска прямо в header  -->
+        <form action="/search" method="get" class="flex">
+          <input
+            type="text"
+            name="q"
+            placeholder="Поиск объекта…"
+            class="px-3 py-1 rounded-l bg-white text-gray-900 focus:outline-none"
+            required
+          />
+          <button class="px-3 py-1 bg-blue-800 hover:bg-blue-900 rounded-r">Search</button>
+        </form>
+      </header>
+  <main class="container mx-auto px-4">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

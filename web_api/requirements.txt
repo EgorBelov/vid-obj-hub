@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+jinja2
+aiofiles           # для UploadFile
+httpx
+python-multipart
+python-dotenv
