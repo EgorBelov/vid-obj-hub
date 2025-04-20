@@ -5,3 +5,5 @@ aiofiles           # для UploadFile
 httpx
 python-multipart
 python-dotenv
+ffmpeg-python
+yt-dlp

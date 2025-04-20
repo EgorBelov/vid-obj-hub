@@ -1,32 +1,57 @@
+<!-- status.html -->
 {% extends "layout.html" %}
 {% block content %}
-<a href="/" class="text-blue-600">&larr; домой</a>
-<h2 class="text-xl font-semibold mt-4 mb-2">Видео ID {{ video.id }}</h2>
-<p>Статус: <strong>{{ video.status }}</strong></p>
+<a href="/" class="text-blue-600 hover:underline">&larr; Домой</a>
+
+<style>
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.6s ease-out forwards;
+  }
+</style>
+
+<h2 class="text-2xl font-bold mt-6 mb-4">Видео ID: {{ video.id }}</h2>
+<p class="mb-2">Статус обработки: <span class="font-semibold text-blue-700">{{ video.status }}</span></p>
+
 {% if video.status != "processed" %}
-  <p class="mt-2">Страница обновляется каждые 5 секунд…</p>
-  <script>setTimeout(()=>location.reload(),5000)</script>
+  <p class="text-sm text-gray-500">Обновление каждые 5 секунд… <span class="animate-pulse text-blue-500">⏳</span></p>
+  <script>
+    setTimeout(() => location.reload(), 5000);
+  </script>
 {% else %}
-  <h3 class="text-lg font-medium mt-6 mb-2">Объекты</h3>
+  <h3 class="text-xl font-semibold mt-6 mb-4">Обнаруженные объекты</h3>
+
   {% if objects %}
-    <table class="table-auto bg-white shadow rounded">
-      <thead class="bg-gray-200">
-        <tr><th class="px-3 py-1">Label</th><th>Count</th><th>Avg conf</th><th>Best conf</th><th>Best sec</th></tr>
-      </thead>
-      <tbody>
-      {% for o in objects %}
-        <tr class="border-t">
-          <td class="px-3 py-1">{{ o.label }}</td>
-          <td>{{ o.total_count }}</td>
-          <td>{{ '%.2f'|format(o.avg_confidence) }}</td>
-          <td>{{ '%.2f'|format(o.best_confidence) }}</td>
-          <td>{{ '%.1f'|format(o.best_second) }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+    <div class="overflow-x-auto animate-fade-in">
+      <table class="w-full bg-white shadow rounded-lg">
+        <thead class="bg-gray-100 text-left">
+          <tr>
+            <th class="px-4 py-2">Label</th>
+            <th>Count</th>
+            <th>Avg conf</th>
+            <th>Best conf</th>
+            <th>Best sec</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in objects %}
+          <tr class="border-t hover:bg-gray-50">
+            <td class="px-4 py-2">{{ o.label }}</td>
+            <td>{{ o.total_count }}</td>
+            <td>{{ '%.2f'|format(o.avg_confidence) }}</td>
+            <td>{{ '%.2f'|format(o.best_confidence) }}</td>
+            <td>{{ '%.1f'|format(o.best_second) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p>Ничего не обнаружено.</p>
+    <p class="text-gray-600">Объекты не обнаружены.</p>
   {% endif %}
 {% endif %}
 {% endblock %}
