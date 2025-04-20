@@ -1,31 +1,39 @@
+<!-- search.html -->
 {% extends "layout.html" %}
 {% block content %}
-<a href="/" class="text-blue-600 hover:underline">&larr; домой</a>
-<!-- остальное остаётся без изменений -->
+<a href="/" class="text-blue-600 hover:underline">&larr; Домой</a>
 
-<h2 class="text-xl font-semibold mb-4">Поиск</h2>
+<h2 class="text-2xl font-bold mt-4 mb-6">Результаты поиска</h2>
 <form method="get" action="/search" class="flex gap-3 mb-6">
-  <input name="q" value="{{ query }}" placeholder="person, car…" class="flex-1 border rounded px-3 py-2" />
-  <button class="px-4 py-2 bg-blue-600 text-white rounded">Search</button>
+  <input name="q" value="{{ query }}" placeholder="person, car…" class="flex-1 px-4 py-2 border rounded" />
+  <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Поиск</button>
 </form>
+
 {% if results %}
-  <table class="table-auto bg-white shadow rounded">
-    <thead class="bg-gray-200">
-      <tr><th class="px-3 py-1">Video ID</th><th>Label</th><th>Best sec</th></tr>
-    </thead>
-    <tbody>
-    {% for row in results %}
-      <tr class="border-t hover:bg-gray-50">
-        <td class="px-3 py-1">
-          <a href="/status/{{ row.video_id }}" class="text-blue-600 hover:underline">{{ row.video_id }}</a>
-        </td>
-        <td>{{ row.label }}</td>
-        <td>{{ '%.1f'|format(row.best_second) }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <div class="overflow-x-auto">
+    <table class="w-full bg-white shadow rounded-lg">
+      <thead class="bg-gray-100 text-left">
+        <tr>
+          <th class="px-4 py-2">Видео</th>
+          <th>Объект</th>
+          <th>Лучшая секунда</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in results %}
+        <tr class="border-t hover:bg-gray-50">
+          <td class="px-4 py-2">
+            <a href="/status/{{ row.video_id }}" class="text-blue-600 hover:underline">{{ row.video_id }}</a>
+          </td>
+          <td>{{ row.label }}</td>
+          <td>{{ '%.1f'|format(row.best_second) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 {% elif query %}
-  <p>Ничего не найдено.</p>
+  <p class="text-gray-600">Ничего не найдено.</p>
 {% endif %}
 {% endblock %}
+
