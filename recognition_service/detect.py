@@ -10,7 +10,7 @@ from decouple import config
 
 from recognition_service.celery_app import celery_app
 
-# Загружаем модель YOLOv8n (предполагается, что файл yolov8n.pt находится в рабочем каталоге или доступен)
+# Загружаем модель YOLOv12n (предполагается, что файл yolov8n.pt находится в рабочем каталоге или доступен)
 model = YOLO("yolo12n.pt")
 
 # URL DB-сервиса, например "http://localhost:8000"
