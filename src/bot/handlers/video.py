@@ -13,6 +13,13 @@ from src.bot.keyboards.status import get_status_keyboard
 # URL DB-сервиса (например, http://localhost:8000)
 DB_SERVICE_URL = config("DB_SERVICE_URL", default="http://localhost:8000")
 VIDEO_STORAGE = config('VIDEO_STORAGE', default="videos")
+
+
+async def start_video(message: types.Message):
+    await message.answer(
+        "Пришлите видео."
+    )
+
 if not os.path.exists(VIDEO_STORAGE):
     os.makedirs(VIDEO_STORAGE)
 

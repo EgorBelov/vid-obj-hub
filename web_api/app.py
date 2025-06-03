@@ -1,17 +1,20 @@
 import asyncio
+from turtle import pd
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import httpx, io, hashlib, os
 from decouple import config
 from datetime import datetime
+
+import xlsxwriter
 from recognition_service.celery_app import celery_app
 from s3.s3_client import upload_fileobj
 import yt_dlp
 import re, json
 from web_api.utils.downloader import fetch_video_bytes
-
+import pandas as pnd 
 
 DB_URL = config("DB_SERVICE_URL", default="http://localhost:8000")
 API_PORT = int(config("WEB_API_PORT", default=8080))
@@ -209,5 +212,74 @@ async def search_page(request: Request, q: str = ""):
         "search.html",
         {"request": request, "query": q, "results": results}
     )
+
+
+@app.get("/export/{video_id}.xlsx")
+async def export_objects_excel(video_id: int):
+    async with httpx.AsyncClient(timeout=15) as c:
+        v  = await c.get(f"{DB_URL}/videos/{video_id}")
+        ob = await c.get(f"{DB_URL}/videos/{video_id}/objects")
+    if v.status_code != 200 or ob.status_code != 200:
+        raise HTTPException(404, "data not found")
+
+    objects = ob.json()
+    if not objects:
+        raise HTTPException(404, "no objects")
+
+    # ─── создаём Excel в памяти ─────────────────────────────────
+    buf = io.BytesIO()
+    wb  = xlsxwriter.Workbook(buf, {'in_memory': True})
+    ws  = wb.add_worksheet("Objects")
+
+    headers = ["Label", "Total", "Avg_conf", "Best_conf", "Best_second"]
+    ws.write_row(0, 0, headers)
+
+    for i, o in enumerate(objects, start=1):
+        ws.write_row(i, 0, [
+            o["label"], o["total_count"],
+            round(o["avg_confidence"], 3),
+            round(o["best_confidence"], 3),
+            o["best_second"],
+        ])
+
+    last = len(objects)  # последняя строка
+
+    # ─── Chart 1: PIE (Total) ──────────────────────────────────
+    pie = wb.add_chart({'type': 'pie'})
+    pie.add_series({
+        'name':       'Total',
+        'categories': ['Objects', 1, 0, last, 0],   # A2:A{n}
+        'values':     ['Objects', 1, 1, last, 1],   # B2:B{n}
+        'data_labels': {'percentage': True},
+    })
+    pie.set_title({'name': 'Количество объектов'})
+    ws.insert_chart('G2', pie, {'x_scale': 1.1, 'y_scale': 1.1})
+
+    # ─── Chart 2: BAR (Avg_conf) ───────────────────────────────
+    bar = wb.add_chart({'type': 'column'})
+    bar.add_series({
+        'name':       'Avg_confidence',
+        'categories': ['Objects', 1, 0, last, 0],   # A2:A{n}
+        'values':     ['Objects', 1, 2, last, 2],   # C2:C{n}
+    })
+    bar.set_title({'name': 'Средняя уверенность'})
+    bar.set_x_axis({'name': 'Label'})
+    bar.set_y_axis({'name': 'Avg'})
+    ws.insert_chart('G20', bar, {'x_scale': 1.1, 'y_scale': 1.1})
+
+    wb.close()
+    buf.seek(0)
+
+    headers = {
+        "Content-Disposition":
+        f'attachment; filename="video_{video_id}_objects.xlsx"'
+    }
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers
+    )
+
+
 
 # ---------- launch with  `uvicorn web_api.app:app --reload --port 8080`

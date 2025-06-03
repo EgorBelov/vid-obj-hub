@@ -7,3 +7,6 @@ python-multipart
 python-dotenv
 ffmpeg-python
 yt-dlp
+pandas>=2.0
+openpyxl>=3.1
+xlsxwriter>=3.2
