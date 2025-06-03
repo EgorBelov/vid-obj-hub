@@ -2,7 +2,7 @@
 from typing import AsyncGenerator, List
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import JSONResponse
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from database import AsyncSessionLocal, engine
 import models, schemas, crud
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -112,6 +112,24 @@ async def create_object_for_video(video_id: int, vo_data: schemas.VideoObjectCre
 async def search(q: str, db: AsyncSession = Depends(get_db)):
     results = await crud.search_objects(db, q)
     return results
+
+
+@app.get("/videos-by-labels", response_model=list[schemas.Video])
+async def search_by_labels(labels: str, db: AsyncSession = Depends(get_db)):
+    terms = [l.strip() for l in labels.split(",") if l.strip()]
+    if not terms:
+        raise HTTPException(status_code=400, detail="No labels provided")
+
+    stmt = (
+        select(models.Video)
+        .join(models.VideoObject)
+        .where(models.VideoObject.label.in_(terms))
+        .distinct()
+        .limit(100)
+    )
+    videos = (await db.execute(stmt)).scalars().all()
+    return videos
+
 
 
 if __name__ == '__main__':

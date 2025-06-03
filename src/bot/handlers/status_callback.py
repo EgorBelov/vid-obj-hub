@@ -5,10 +5,11 @@ from decouple import config
 
 DB_SERVICE_URL = config("DB_SERVICE_URL", default="http://localhost:8000")
 
+
 async def status_callback_handler(callback: types.CallbackQuery):
     """
-    Обработчик callback-запроса для проверки статуса видео.
-    Ожидается, что callback.data имеет вид: "status:<video_id>"
+    Обработка inline-кнопки «status:<video_id>».
+    Показываем статус, расшифровку объектов и стараемся прислать само видео.
     """
     try:
         video_id = int(callback.data.split(":", 1)[1])
@@ -17,43 +18,54 @@ async def status_callback_handler(callback: types.CallbackQuery):
         return
 
     async with httpx.AsyncClient() as client:
-        # Получаем данные видео
-        video_response = await client.get(f"{DB_SERVICE_URL}/videos/{video_id}")
-        if video_response.status_code == 404:
-            await callback.message.reply(f"Видео с id={video_id} не найдено.")
+        # -- сведения о ролике --
+        video_resp = await client.get(f"{DB_SERVICE_URL}/videos/{video_id}")
+        if video_resp.status_code == 404:
+            await callback.message.reply(f"Видео {video_id} не найдено.")
+            await callback.answer()
             return
-        video_data = video_response.json()
+        video = video_resp.json()
 
-        # Если статус видео не "processed", сообщаем об этом
-        if video_data.get("status") != "processed":
-            await callback.message.reply(f"Статус видео {video_id}: {video_data.get('status')}.")
+        # -- если не обработано, просто сообщаем статус --
+        if video.get("status") != "processed":
+            await callback.message.reply(f"Статус видео {video_id}: {video.get('status')}.")
+            await callback.answer()
             return
 
-        # Получаем агрегированные данные по объектам
-        objects_response = await client.get(f"{DB_SERVICE_URL}/videos/{video_id}/objects")
-        if objects_response.status_code != 200:
-            await callback.message.reply("Не удалось получить данные по объектам.")
-            return
-        objects = objects_response.json()
+        # -- агрегированные объекты --
+        obj_resp = await client.get(f"{DB_SERVICE_URL}/videos/{video_id}/objects")
+        objects = obj_resp.json() if obj_resp.status_code == 200 else []
 
-    if not objects:
-        await callback.message.reply("В этом видео не обнаружено объектов.")
-    else:
-        text = f"Видео {video_id} (статус={video_data.get('status')}):\n"
-        for obj in objects:
-            label = obj.get("label")
-            count = obj.get("total_count")
-            avg_conf = obj.get("avg_confidence")
-            best_conf = obj.get("best_confidence")
-            best_sec = obj.get("best_second")
+    # -------- ответ пользователю --------
+    if objects:
+        text = f"Видео {video_id} (status=processed):\n"
+        for o in objects:
             text += (
-                f"- {label}: {count} шт., "
-                f"средняя уверенность {avg_conf:.2f}, "
-                f"максимальная {best_conf:.2f} (на {best_sec:.1f} сек.)\n"
+                f"- {o['label']}: {o['total_count']} шт., "
+                f"avg_conf={o['avg_confidence']:.2f}, "
+                f"best_conf={o['best_confidence']:.2f} (на {o['best_second']:.1f} с)\n"
             )
         await callback.message.reply(text)
+    else:
+        await callback.message.reply("В этом видео не обнаружено объектов.")
+
+    # -------- пытаемся прислать сам файл --------
+    sent = False
+    try:
+        if video.get("telegram_file_id"):
+            await callback.message.answer_video(video["telegram_file_id"])
+            sent = True
+        elif video.get("s3_url"):
+            await callback.message.answer_video(video["s3_url"])
+            sent = True
+    except Exception:
+        pass
+
+    if not sent:
+        await callback.message.reply("⚠️ Видео недоступно для отправки.")
 
     await callback.answer()
+
 
 def register_status_callback_handlers(dp):
     dp.callback_query.register(
