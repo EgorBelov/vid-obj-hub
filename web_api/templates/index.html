@@ -3,11 +3,19 @@
 {% block content %}
 
 <!-- Уведомление после отправки -->
-<div x-data="{ show: false }" x-show="show" x-init="show = true; setTimeout(() => show = false, 3000)"
-     x-transition
-     class="mb-6 p-4 bg-green-100 text-green-800 rounded shadow">
+{% if request.query_params.get('success') %}
+<div x-data="{open:true}"
+     x-cloak
+     x-show="open"
+     x-init="setTimeout(()=>open=false,3000)"
+     @click="open=false"
+     x-transition.opacity.duration.300ms
+     class="mb-6 p-4 bg-green-100 text-green-800 rounded shadow cursor-pointer"
+     x-show.transition.opacity.duration.300ms="open"
+     x-show.remove>
   ✅ Видео успешно отправлено на обработку!
 </div>
+{% endif %}
 
 <div class="grid md:grid-cols-2 gap-8">
   <div class="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition" x-data="{ loading: false }">
@@ -39,6 +47,23 @@
     </form>
   </div>
 </div>
+
+<!-- ——— Список всех видео ——— -->
+<h2 class="text-xl font-semibold mt-8 mb-4">Все видео</h2>
+
+<div class="flex flex-wrap gap-3">
+  {% for v in videos %}
+    <a href="/status/{{ v.id }}"
+       class="px-3 py-2 rounded-lg text-sm shadow
+              {% if v.status == 'processed'   %} bg-green-600 hover:bg-green-700 text-white
+              {% elif v.status == 'processing'%} bg-yellow-500 hover:bg-yellow-600 text-white
+              {% else %}                       bg-gray-300 hover:bg-gray-400 text-gray-800
+              {% endif %}">
+      #{{ v.id }} · {{ v.status }}
+    </a>
+  {% endfor %}
+</div>
+
 {% endblock %}
 
 

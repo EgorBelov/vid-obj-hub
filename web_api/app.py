@@ -113,7 +113,13 @@ async def download_file(url: str, timeout: int = 60) -> bytes:
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    async with httpx.AsyncClient(timeout=20) as c:
+        # ⚠️  При большом количестве роликов лучше ограничить, напр. limit=500
+        videos = (await c.get(f"{DB_URL}/videos/")).json()
+        return templates.TemplateResponse(
+            "index.html",
+            {"request": request, "videos": videos}
+    )
 
 @app.post("/upload/file")
 async def upload_file(request: Request, file: UploadFile = File(...)):
